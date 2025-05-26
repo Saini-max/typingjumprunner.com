@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Typing Jump Virus Runner</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas {
+      display: block;
+      border: 3px solid #222;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+let score = 0;
+let gameOver = false;
+let angle = 0;
+let bgX = 0;
+const bgSpeed = 2;
+
+const groundY = canvas.height - 100;
+
+// Images
+const virusImg = new Image();
+virusImg.src = "https://static.vecteezy.com/system/resources/previews/019/582/395/original/virus-icon-symbol-png.png";
+
+const starImg = new Image();
+starImg.src = "https://static.vecteezy.com/system/resources/thumbnails/021/056/241/small_2x/the-man-with-all-his-thoughts-free-png.png";
+
+const syringeImg = new Image();
+syringeImg.src = "https://freepngimg.com/thumb/syringe/22458-8-syringe-image-thumb.png";
+
+const bgImg = new Image();
+bgImg.src = "https://s3.envato.com/files/170596024/City_Background_4267x2133.jpg";
+
+let player = {
+  x: 100,
+  y: groundY - 80,
+  width: 120,
+  height: 120,
+  vy: 0,
+  gravity: 0.9,
+  jump: -25,
+  isOnGround: true
+};
+
+let stars = [];
+let drones = [];
+
+function spawnStar() {
+  stars.push({ x: canvas.width, y: groundY - 100, width: 130, height: 130 });
+}
+function spawnDrone() {
+  drones.push({ x: canvas.width, y: groundY - 95, width: 130, height: 130 });
+}
+setInterval(spawnStar, 3000);
+setInterval(spawnDrone, 2000);
+
+// High score from localStorage
+let highScore = localStorage.getItem("highScore") || 0;
+highScore = Number(highScore);
+
+// Typing key system
+const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+let currentKey = randomKey();
+
+function randomKey() {
+  return letters.charAt(Math.floor(Math.random() * letters.length));
+}
+
+// Controls
+document.addEventListener("keydown", e => {
+  if (!gameOver) {
+    if (e.key.toUpperCase() === currentKey && player.isOnGround) {
+      player.vy = player.jump;
+      player.isOnGround = false;
+      currentKey = randomKey(); // new key after correct press
+    }
+  }
+  if (gameOver && e.key === "Enter") {
+    location.reload();
+  }
+});
+
+function update() {
+  player.vy += player.gravity;
+  player.y += player.vy;
+
+  if (player.y >= groundY - player.height) {
+    player.y = groundY - player.height;
+    player.vy = 0;
+    player.isOnGround = true;
+  }
+
+  stars.forEach(s => s.x -= 6);
+  drones.forEach(d => d.x -= 8);
+
+  stars = stars.filter(s => {
+    if (isColliding(player, s)) {
+      score++;
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem("highScore", highScore);
+      }
+      return false;
+    }
+    return s.x + s.width > 0;
+  });
+
+  drones = drones.filter(d => {
+    if (isColliding(player, d)) {
+      gameOver = true;
+    }
+    return d.x + d.width > 0;
+  });
+
+  angle += 0.1;
+  bgX -= bgSpeed;
+  if (bgX <= -canvas.width) {
+    bgX = 0;
+  }
+}
+
+function drawVirus(x, y, width, height) {
+  ctx.save();
+  ctx.translate(x + width / 2, y + height / 2);
+  ctx.rotate(angle);
+  ctx.drawImage(virusImg, -width / 2, -height / 2, width, height);
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw moving background
+  ctx.drawImage(bgImg, bgX, 0, canvas.width, canvas.height);
+  ctx.drawImage(bgImg, bgX + canvas.width, 0, canvas.width, canvas.height);
+
+  // Draw ground
+  ctx.fillStyle = "rgba(100, 60, 20, 0.6)";
+  ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+  // Draw player
+  drawVirus(player.x, player.y, player.width, player.height);
+
+  // Draw stars
+  stars.forEach(s => ctx.drawImage(starImg, s.x, s.y, s.width, s.height));
+
+  // Draw drones (syringes)
+  drones.forEach(d => ctx.drawImage(syringeImg, d.x, d.y, d.width, d.height));
+
+  // Score & High Score
+  ctx.fillStyle = "#fff";
+  ctx.font = "20px Arial";
+  ctx.textAlign = "left";
+  ctx.fillText("Score: " + score, 40, 30);
+  ctx.fillText("High Score: " + highScore, 40, 60);
+
+  // Made By Text
+  ctx.fillStyle = "#fff";
+  ctx.font = "18px Arial";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+  ctx.fillText("Made By Mohit Kumar", canvas.width - 20, 10);
+
+  // Draw current required key big in center bottom
+  ctx.fillStyle = "yellow";
+  ctx.font = "80px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(currentKey, canvas.width / 2, canvas.height - 100);
+
+  if (gameOver) {
+    ctx.fillStyle = "black";
+    ctx.font = "40px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2);
+    ctx.font = "20px Arial";
+    ctx.fillText("Press Enter to Restart", canvas.width / 2, canvas.height / 2 + 40);
+  }
+}
+
+function gameLoop() {
+  if (!gameOver) update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function isColliding(a, b) {
+  return a.x < b.x + b.width &&
+         a.x + a.width > b.x &&
+         a.y < b.y + b.height &&
+         a.y + a.height > b.y;
+}
+
+let loaded = 0;
+const total = 4;
+[virusImg, starImg, syringeImg, bgImg].forEach(img => {
+  img.onload = () => {
+    loaded++;
+    if (loaded === total) {
+      gameLoop();
+    }
+  };
+});
+</script>
+</body>
+</html>
